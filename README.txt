@@ -1,4 +1,7 @@
-Welcome to the repository of my portfolio. I believe in transparency, so it is all here to see. Below are the credits for the HTML template I used to create this webpage, and while I made changes to every portion, I did not write all of the HTML and CSS from scratch. However, the projects linked to the webpage are entirely my own, and the raw code can also be found here.
+Welcome to the repository of my portfolio. I believe in transparency, so it is all here to see. 
+Below are the credits for the HTML template I used to create this webpage, and while I made changes 
+to every portion, I did not write all of the HTML and CSS from scratch. However, the projects 
+linked to the webpage are entirely my own, and the raw code can also be found here.
 
 
 
