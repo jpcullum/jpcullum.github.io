@@ -1,0 +1,452 @@
+---
+title: |
+  <center> Data: </center>
+  <center> Visualization and Analytics </center>
+  <center>    </center>
+author: |
+  <center> Joshua P. Cullum </center>
+output: html_document
+---
+
+### Overview
+
+Within the world data science and analytics there lie a plethora of techniques and strategies at the finger tips of the analyst. Below I will display a few of the more useful techniques I have used working as a scientist and a student. While each dataset holds unique parameters and presenting data in a useful format varies by each audience, using basic datasets should showcase these methods well. As most analysis work is completed on confidential data, many of my professional projects are currently hidden from public view. As such, below please find a sampling of the techniques I have used, but here displayed on public data.
+
+<br>
+
+#### Table of Contents
+
+1) Data Breakdown
+
+2) Time Series Analysis
+
+3) Spatial Analysis
+
+4) Plotly 3D
+
+5) Correlation Analysis
+
+<br>
+
+### Data Breakdown
+<br>
+One of the most important steps in any analysis is to understand the data being analyzed. This includes understanding the dataset itself, the limitations of the data, how it was collected, any biases represented in it, and industry knowledge surrounding it. When first surveying any data, a simple analysis can go a long way in preventing future headache. If one can maintain site of the finish line in a maze, it will be easier to find it when digging among the weeds.
+<br>
+
+```{r,warning=F,message=F}
+
+library(pastecs)
+library(ggplot2)
+library(gridExtra)
+library(ggthemes)
+library(RColorBrewer)
+library(gifski)
+library(gganimate)
+library(transformr)
+library(spData)
+library(leaflet)
+library(plotly)
+library(ggbiplot)
+library(dplyr)
+
+
+```
+
+
+``` {r,warning=F,message=F}
+
+options(scipen = 1000)
+options(digist = 3)
+
+AirQuality <- airquality
+
+head(AirQuality)
+str(AirQuality)
+
+AirQuality$Month[!duplicated(AirQuality$Month)]
+
+
+stat.desc(AirQuality[,1:4])
+
+
+
+```
+
+<br>
+
+Here we can see we are dealing with a simple dataframe with four variables and time points for each observations. This is broken into month and day columns. This is good to know because we may want another column set as "Julian Day" to indicate days in a time series, not just within a month.
+<br>
+Let us look at the breakdown of each element with some basic characteristics.
+<br>
+
+``` {r, warning=F,message=F, fig.align='center'}
+
+Blues <- brewer.pal(9,"Blues")
+
+OrRd <- brewer.pal(9,"OrRd")
+
+YlOrRd <- brewer.pal(9,"YlOrRd")
+
+Greys <- brewer.pal(9,"Greys")
+
+
+grid.arrange(
+  ggplot(data=AirQuality, aes(Ozone)) +
+    geom_histogram(bins = 15, col = Blues[8], fill = Blues[6], alpha=0.7)+
+    xlab("Ozone")+
+    ylab("Frequency")+
+    theme_hc()+
+    ylim(0,35),
+  ggplot(data=AirQuality, aes(Solar.R))+
+    geom_histogram(bins = 15, col = YlOrRd[4], fill = YlOrRd[2], alpha=0.7)+
+    xlab("Solar Radiation") +
+    ylab("")+
+    theme_hc()+
+    ylim(0,35),
+  ggplot(data=AirQuality, aes(Wind))+
+    geom_histogram(bins = 15, col = Greys[6], fill = Greys[4], alpha=0.7)+
+    xlab("Wind Speed")+
+    ylab("Frequency")+
+    theme_hc()+
+    ylim(0,35),
+  ggplot(data=AirQuality, aes(Temp))+
+    geom_histogram(bins = 15, col = OrRd[8], fill = OrRd[6], alpha=0.7)+
+    geom_density()+
+    xlab("Temperature")+
+    ylab("")+
+    theme_hc()+
+    ylim(0,35),
+  nrow=2,
+  ncol=2,
+  top = paste("Histograms of Variables in Air Quality Dataset \n ", sep = "\n"))
+
+```
+
+<br>
+
+With the above information, we know a bit more about what our dataset holds. We know it contains just over 150 records, which is not a lot but certainly enough to perform a simple analysis on, and it has four variables that are recorded. This dataset is recorded as a time series, so we also have two columns to track the day and month. Looking closer at each variable, we can see all of the basic statistics we would want to know, and then see these visually represented in a Histogram of each variable.
+<br>
+Depending on the direction we would want to take this analysis, this would aid us in determining what we can and cannot do, as well as tell us if we need more data in order to continue.
+
+<br>
+<br>
+
+
+### Time Series Analysis
+<br>
+Now that we have some basic statistics on the spread of the data itself, we can begin viewing data from various angles. Here, we are fortunate enough to have a dataset that includes a column for time of collection, so we will continue to use the AirQuality dataset built in to RStudio. This will allow us to inspect the data from the perspective of change over time, to determine if there may be any trends present. Analysis allows us to come up with some ideas for future analysis, places we want to focus our effort so to speak. While these trends have not been statistically tested yet, and so we cannot draw conclusions from them, a good analysis will point to areas of interest where we will want to focus our future statistical efforts.
+<br>
+For example, when in a business or scientific setting, resources (especially time) are always limited. A good analysis will highlight the areas which hold the most promise, where that limited capacity can be used to the fullest extent. If a particular area of interest displays a trend within the small initial dataset, that may be an area where a full statistical review with a fully formed, new dataset are in order. While we cannot create hypotheses on a trend in and dataset and use the same dataset to test that same trend, a good analysis can give us a direction where our efforts will be most fruitful.
+<br>
+In this analysis, we will first create a column to specify what would be the "Julian Day", which will allow us to graph this series easily. Secondly, we will create a second column for each of the four variables. This column will place the value as a percentage between minimum and maximum for that column, allowing us to overlay the data and view if any trends are present. All four variables are related in some way, as each atmospheric condition affects the others. However, we must note that altering axes can be dangerous and the graphics must be taken with a grain of salt. They are merely a tool to allow us to inspect the data, and if we determine there may be some sort of pattern it does not necessitate a pattern, but only gives us more grounds to investigate that possibility.
+To create these "percentage" columns, we will use the following equation:
+<br>
+<br>
+$$1-\displaystyle \frac{range - (value - min)}{range}$$
+<br>
+This will produce a number between 0 and 1, with the value displayed as a fraction of the whole. The maximum value in the set will equal 1, while the minimum value in the set will equal 0.
+<br>
+<br>
+Before we complete that secondary analysis bringing the elements together, let us look at the data all togather:
+<br>
+<br>
+```{r,warning=F,message=F,fig.align='center'}
+
+stack_AQ <- stack(AirQuality[,1:4]) %>%
+  mutate(Day = rep(1:153,4))
+
+ggplot(
+  stack_AQ, 
+  aes(Day, values, fill = factor(ind))
+) +
+  geom_point(pch=21, size =3)+
+  labs(x = "Experiment Day", y = "", fill = "")+
+  theme_hc()+
+  scale_color_manual(values = c(Blues[6],YlOrRd[2],Greys[4],OrRd[6]),
+                     aesthetics = "fill",
+                     labels = c("Ozone","Solar Radiation","Wind","Temperature")
+  )
+
+```
+<br>
+<br>
+
+``` {r, message=F,warning=F, fig.align='center'}
+
+AirQuality$DaySeries <- as.numeric(rownames(AirQuality))
+
+PercEqu <- function(x) {
+  
+  y <- 1- (((max(x, na.rm=T) - min(x, na.rm=T)) - (x - min(x,na.rm=T)))/(max(x, na.rm=T) - min(x, na.rm=T)))
+  return(y)
+  
+}
+
+Percents <- data.frame(apply(AirQuality[,1:4],2,PercEqu))
+colnames(Percents) <- paste(colnames(Percents),"_p",sep="")
+AirQuality <- data.frame(cbind(AirQuality,Percents))
+
+
+
+grid.arrange(
+  ggplot(AirQuality, aes(DaySeries,Ozone_p))+
+    geom_bar(stat="identity", col = Blues[8], fill = Blues[6])+
+    theme_hc()+
+    ylab("Ozone")+
+    xlab(""),
+  ggplot(AirQuality, aes(DaySeries,Solar.R_p))+
+    geom_bar(stat="identity", col = YlOrRd[4], fill = YlOrRd[2])+
+    theme_hc()+
+    ylab("Solar Radiation")+
+    xlab(""),
+  ggplot(AirQuality, aes(DaySeries,Wind_p))+
+    geom_bar(stat="identity", col = Greys[6], fill = Greys[4])+
+    theme_hc()+
+    ylab("Wind Speed")+
+    xlab("Experiment Day"),
+  ggplot(AirQuality, aes(DaySeries,Temp_p))+
+    geom_bar(stat="identity", col = OrRd[8], fill = OrRd[6])+
+    theme_hc()+
+    ylab("Temperature")+
+    xlab("Experiment Day"),
+nrow=2,
+ncol=2,
+top = paste("Time Series of Each Variable\nExpressed as Percent of Max of Range\n", sep = "\n"))
+
+
+```
+
+<br>
+<br>
+Looking at these graphics, we can see that there may be a similarity in trends between Ozone and Temperature. This could make sense, as Ozone does affect temperature.
+<br>
+Let us take one final look at this in a small animated graphic below:
+<br>
+``` {r,message=F,warning=F}
+
+stack_AQ_perc <- stack(AirQuality[,c(11,8)]) %>%
+                         mutate(Day = rep(1:153,2)) %>%
+                         filter(!is.na(values)) %>%
+                         mutate(col = ifelse(ind == "Ozone_p", Blues[8], OrRd[8]))
+  
+ggplot(stack_AQ_perc,
+       aes(Day,values, fill = ind)) +
+  geom_area(stat="identity", 
+            position="identity",
+            col = stack_AQ_perc$col,
+            size = 0.5,
+            alpha = 0.8) +
+  scale_fill_manual(values = c(OrRd[6],Blues[6]), labels = c("Temperature", "Ozone")) +
+  theme_hc()+
+  labs(x="Experiment Day",y="", fill = "", title = "Temperature and Ozone Comparison")+
+  theme(plot.title = element_text(hjust = 0.5))+
+  transition_reveal(Day)
+
+
+```
+<br>
+<br>
+The animation gives us a good idea of how Ozone and Temperature appear to be related, showing that the rises and falls of each seem to come together. 
+<br>
+<br>
+
+### Spatial Analysis
+<br>
+One of the more interesting analyses possible with R is Spatial Analysis. Although most complex spatial analysis is conducted in something like ESRI's ArcGIS Pro, spatial analysis can also be accomplished in R, which makes integration with code quite simple. Here, we will bring in a spatial data set and visually analyze it with an interactive LeafLet map, which is often combined with an RShiny application, and then we will take it a step further and use Plotly to analyze it in three dimensions.
+<br>
+We will bring in the `boston.c` dataset from the `spData` package. This is a housing dataset from 1978.
+<br>
+<br>
+```{r,message=F,warning=F}
+
+Boston <- boston.c
+
+RdYlBu <- brewer.pal(11,"RdYlBu")
+
+pal.values.pop <- colorNumeric(
+  palette = c(RdYlBu[11], RdYlBu[8], RdYlBu[4],RdYlBu[1]),
+  domain = Boston$CMEDV
+  
+)
+
+
+leaflet(width = 900) %>%
+  addTiles() %>%
+  addCircleMarkers(lng = Boston$LON,
+                   lat = Boston$LAT,
+                   radius = 7,
+                   fillColor = pal.values.pop(Boston$CMEDV),
+                   color = pal.values.pop(Boston$CMEDV),
+                   stroke = T,
+                   weight = 2,
+                   fillOpacity = 0.6,
+                   opacity = 1,
+                   popup = paste0("Median Home Value: $",Boston$CMEDV*1000),
+                   options = popupOptions(closeButton = T))
+
+```
+<br>
+<br>
+Now, we can compare median home value to Crime Rate, per capita.
+<br>
+<br>
+```{r,message=F,warning=F}
+
+pal.values.cr <- colorNumeric(
+  palette = c(RdYlBu[11],RdYlBu[4],RdYlBu[1]),
+  domain = Boston$CRIM
+  
+)
+
+leaflet(width = 900) %>%
+  addTiles() %>%
+  addCircleMarkers(lng = Boston$LON,
+                   lat = Boston$LAT,
+                   radius = 7,
+                   fillColor = pal.values.cr(Boston$CRIM),
+                   color = pal.values.cr(Boston$CRIM),
+                   stroke = T,
+                   weight = 2,
+                   fillOpacity = 0.6,
+                   opacity = 1,
+                   popup = paste0("Crime per capita: ",Boston$CRIM),
+                   options = popupOptions(closeButton = T))
+
+```
+
+
+<br>
+<br>
+Without making an judgements and acknowledging this is a much more complex we can at least visibly demonstrate a correlation between crime rate and median house value, in Boston in 1978. Clicking on any point yields the respective value.
+<br>
+<br>
+
+### Plotly 3D
+<br>
+`Plotly` provides a fullset of techniques to present graphics, but the way in which I prefer to use it is to make 3D plots. `ggplot2` creates fantastic, easily understood plots and graphs for normal purposes, but I find `Plotly` to function better in the 3D realm.
+<br>
+```{r,message=F,warning=F}
+
+
+plot_ly(Boston, 
+        x=~LON, 
+        y=~LAT, 
+        z = ~CMEDV, 
+        type="scatter3d", 
+        marker= list(size = 3, 
+                     color = ~CMEDV,
+                     colorscale =c(RdYlBu[11], RdYlBu[8], RdYlBu[4],RdYlBu[1]),
+                     showscale=T)
+        ) %>%
+  layout(scene = list(
+    xaxis=list(title="Longitude"),
+    yaxis=list(title="Latitude"),
+    zaxis=list(title="Median House Price")
+  ))
+
+
+```
+<br>
+<br>
+This provides a similar view to the one provided in two dimensions, but provides a more striking view of the start differences in housing prices across such a small area. In fact, in the 3D you can see the river cutting the poorest section of town in two, with the more wealthy side of the river have a smaller portion of the economically challenged section.
+<br>
+Now we can compare the crime rates in a similar fashion:
+<br>
+```{r,message=F,warning=F}
+
+
+plot_ly(Boston, 
+        x=~LON, 
+        y=~LAT, 
+        z = ~CRIM, 
+        type="scatter3d", 
+        marker= list(size = 3, 
+                     color = ~CRIM,
+                     colorscale =c(RdYlBu[11],RdYlBu[4],RdYlBu[1]),
+                     showscale=T)
+        ) %>%
+  layout(scene = list(
+    xaxis=list(title="Longitude"),
+    yaxis=list(title="Latitude"),
+    zaxis=list(title="Crime Rate")
+  ))
+
+
+```
+<br>
+<br>
+We can see here that the spot with the highest crime rate lines up again with the poorest area of the city. 
+<br>
+<br>
+
+
+### Principle Component Analysis
+<br>
+Finally, we can complete a small Principle Component Analysis (PCA). This commonly used on "wide" datasets, those with many variables. Through a mathematical process, we can take all of these variables and plot them along "principle components", allowing us to search for the variables which have the strongest correlation across the dataset, and those which account for the largest variation within it.
+<br>
+This can be quite useful in real-world application, as we often encounter large datasets with many variables, and picking through them all for correlation and variation can be tedious. This method, especially using R, makes it quite simple to at least get a handle on the situation.
+<br>
+Oftentimes the `mtcars` dataset in RStudio is used to display PCA Analysis, so we will use the `iris` dataset, which holds fewer variables but will still display the usefulness of the code. This will also allow us to write code that is not as readily copied from the web (as I prefer to write my own code learning from documentation, etc.).
+<br>
+<br>
+```{r,warning=F,message=F}
+
+head(iris)
+
+iris.pca <- prcomp(iris[,1:4],scale.=T,center = T)
+
+summary(iris.pca)
+
+
+```
+<br>
+<br>
+How do we interpret this initial summary? Here we can see that between the first and second principle component (PC1 and PC2), about 96% of the variance is captured. That is a good thing, and will allow us to complete a robust analysis. Let us view this visually.
+<br>
+```{r,message=F,warning=F,fig.align='center'}
+
+ggbiplot(iris.pca,
+         groups=iris$Species,
+         ellipse = T,
+         var.scale = 1,
+         obs.scale = 1) +
+  ggtitle("PCA of Iris Dataset")+
+  xlab("PC1")+
+  ylab("PC2")+
+  theme(plot.title = element_text(hjust = 0.5))
+  
+
+```
+<br>
+<br>
+Here we can see the principle component analysis visually displayed for a simply analysis, and we can view how the variables interact and how the different groups are separated along those variables. Without going into much detail, we can see how using R to complete what is a mathematically complex analysis involving linear algebra and matrices can be easily completed in a few steps using a couple lines of code. 
+<br>
+<br>
+
+
+
+### Contact Information
+
+Thank you for taking time to peruse my analysis. While this is a science, it can also fall into the category of an art form. If you would like to contact me for any reason, please feel free to reach me at my email:
+
+Email: joshuapcullum@gmail.com
+
+Even if you would like to touch base on something unrelated to employment, feel free to reach out. While this is my portfolio, I am always interested to connect with others in my field, and am always open to constructive criticism.
+
+<br> 
+<br>
+<br>
+<br>
+
+
+GitHub: 
+
+LinkedIn: 
+
+Portfolio Website: 
+
+<center> End Document
+
+<br>
+<br>
+
